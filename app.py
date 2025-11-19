@@ -4,7 +4,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from scipy import stats as scipy_stats
 
-# Page Configuration
 st.set_page_config(
     page_title="Fundamental Stock Data Dashboard",
     page_icon="📈",
@@ -12,7 +11,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for Professional Look
 st.markdown("""
 <style>
     .main-header {
@@ -58,22 +56,11 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         font-weight: bold;
     }
-    .correlation-note {
-        font-size: 0.85rem;
-        color: #666;
-        font-style: italic;
-        padding: 0.5rem;
-        background: #f8f9fa;
-        border-radius: 5px;
-        margin-top: 0.5rem;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# Title
 st.markdown('<div class="main-header">📊 Fundamental Stock Analysis Dashboard</div>', unsafe_allow_html=True)
 
-# Load Data
 @st.cache_data
 def load_data():
     stocks = pd.read_csv('data/stocks.csv')
@@ -92,29 +79,24 @@ except Exception as e:
     st.error(f"Error loading data: {e}")
     st.stop()
 
-# Sidebar Configuration
 st.sidebar.markdown("## 🎛️ Dashboard Controls")
 st.sidebar.markdown("---")
 
-# Get list of tickers
 all_tickers = stats['ticker'].dropna().unique().tolist()
 
-# Stock Selection
 st.sidebar.markdown("### 📊 Stock Selection")
 selected_tickers = st.sidebar.multiselect(
     "Select Stocks for Analysis",
     options=all_tickers,
-    default=['MSFT', 'AMZN', 'GOOGL', 'META', 'NVDA', 'TSLA', 'AAPL'] if 'AAPL' in all_tickers else all_tickers[:7],
+    default=['MSFT', 'TSLA', 'GOOGL', 'META', 'AMZN'] if 'MSFT' in all_tickers else all_tickers[:5],
     help="Select one or more stocks to analyze"
 )
 
 if not selected_tickers:
     selected_tickers = all_tickers[:10]
 
-# Display selected count
 st.sidebar.info(f"📌 {len(selected_tickers)} stocks selected")
 
-# Year Range Selection
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📅 Time Period")
 available_years = sorted(revenue['year'].dropna().unique().astype(int).tolist())
@@ -131,23 +113,17 @@ if len(available_years) >= 2:
 else:
     selected_years = available_years
 
-# Filter data
 stats_filtered = stats[stats['ticker'].isin(selected_tickers)]
 valuation_filtered = valuation[valuation['ticker'].isin(selected_tickers)]
-
-# Filter time-series data
 revenue_filtered = revenue[(revenue['ticker'].isin(selected_tickers)) & (revenue['year'].isin(selected_years))]
 profit_filtered = profit[(profit['ticker'].isin(selected_tickers)) & (profit['year'].isin(selected_years))]
 assets_filtered = assets[(assets['ticker'].isin(selected_tickers)) & (assets['year'].isin(selected_years))]
 equity_filtered = equity[(equity['ticker'].isin(selected_tickers)) & (equity['year'].isin(selected_years))]
 cash_filtered = cash[(cash['ticker'].isin(selected_tickers)) & (cash['year'].isin(selected_years))]
 
-# =============================================================================
-# SECTION 1: Executive Summary & KPIs
-# =============================================================================
+# Executive Summary
 st.markdown("## 📈 Executive Summary")
 
-# Calculate KPIs
 col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
@@ -194,12 +170,8 @@ with col5:
 
 st.markdown("---")
 
-# =============================================================================
-# SECTION 2: Performance Analysis
-# =============================================================================
+# Performance Analysis
 st.markdown("## 💰 Performance Analysis")
-
-# Top 10 ROE, ROA, Profit Margin
 st.subheader("Performance Ranking")
 
 col1, col2, col3 = st.columns(3)
@@ -207,7 +179,6 @@ col1, col2, col3 = st.columns(3)
 performance_data = stats_filtered.dropna(subset=['Return on Equity', 'Return on Assets', 'Profit Margin']).copy()
 
 with col1:
-
     if not performance_data.empty:
         top_roe = performance_data.nlargest(10, 'Return on Equity')[['ticker', 'Return on Equity']]
         top_roe = top_roe.sort_values('Return on Equity', ascending=True)
@@ -287,33 +258,26 @@ with col3:
 
 st.markdown("---")
 
-# =============================================================================
-# SECTION 5: Growth Trajectory Analysis
-# =============================================================================
+# Growth Trajectory Analysis
 st.markdown("## 📉 Growth Trajectory Analysis")
 
 col1, col2 = st.columns(2)
 
-# Chart 1: Revenue & YoY Combined Chart
 with col1:
     st.subheader("Revenue & YoY Growth")
 
     if not revenue_filtered.empty:
-        # Calculate YoY growth for revenue
         revenue_yoy = revenue_filtered.copy()
         revenue_yoy = revenue_yoy.sort_values(['ticker', 'year'])
         revenue_yoy['YoY Growth %'] = revenue_yoy.groupby('ticker')['revenue'].pct_change() * 100
 
-        # Aggregate by year for all selected stocks
         revenue_agg = revenue_yoy.groupby('year').agg({
             'revenue': 'sum',
             'YoY Growth %': 'mean'
         }).reset_index()
 
-        # Create combined chart with dual y-axis
         fig_rev_yoy = go.Figure()
 
-        # Bar chart for revenue
         fig_rev_yoy.add_trace(go.Bar(
             x=revenue_agg['year'],
             y=revenue_agg['revenue'],
@@ -322,7 +286,6 @@ with col1:
             yaxis='y'
         ))
 
-        # Forecast for next year using linear regression
         if len(revenue_agg) >= 2:
             years = revenue_agg['year'].values
             revenues = revenue_agg['revenue'].values
@@ -330,7 +293,6 @@ with col1:
             next_year = int(years.max()) + 1
             forecast_revenue = slope * next_year + intercept
 
-            # Add forecast bar
             fig_rev_yoy.add_trace(go.Bar(
                 x=[next_year],
                 y=[forecast_revenue],
@@ -341,7 +303,6 @@ with col1:
                 showlegend=False
             ))
 
-            # Add annotation for forecast (without arrow)
             fig_rev_yoy.add_annotation(
                 x=next_year,
                 y=forecast_revenue,
@@ -351,7 +312,6 @@ with col1:
                 font=dict(size=10)
             )
 
-        # Line chart for YoY growth
         fig_rev_yoy.add_trace(go.Scatter(
             x=revenue_agg['year'],
             y=revenue_agg['YoY Growth %'],
@@ -362,7 +322,6 @@ with col1:
             yaxis='y2'
         ))
 
-        # Forecast YoY growth using linear regression
         if len(revenue_agg) >= 2:
             yoy_values = revenue_agg['YoY Growth %'].dropna().values
             yoy_years = revenue_agg[revenue_agg['YoY Growth %'].notna()]['year'].values
@@ -373,7 +332,6 @@ with col1:
                 last_yoy = revenue_agg['YoY Growth %'].dropna().iloc[-1]
                 last_year = int(revenue_agg[revenue_agg['YoY Growth %'].notna()]['year'].iloc[-1])
 
-                # Add dashed line from last point to forecast
                 fig_rev_yoy.add_trace(go.Scatter(
                     x=[last_year, next_year],
                     y=[last_yoy, forecast_yoy],
@@ -383,7 +341,6 @@ with col1:
                     showlegend=False
                 ))
 
-                # Add forecast point for YoY
                 fig_rev_yoy.add_trace(go.Scatter(
                     x=[next_year],
                     y=[forecast_yoy],
@@ -415,26 +372,21 @@ with col1:
     else:
         st.info("No revenue data available for selected stocks")
 
-# Chart 2: Net Income & YoY Combined Chart
 with col2:
     st.subheader("Net Income & YoY Growth")
 
     if not profit_filtered.empty:
-        # Calculate YoY growth for profit
         profit_yoy = profit_filtered.copy()
         profit_yoy = profit_yoy.sort_values(['ticker', 'year'])
         profit_yoy['YoY Growth %'] = profit_yoy.groupby('ticker')['profit'].pct_change() * 100
 
-        # Aggregate by year for all selected stocks
         profit_agg = profit_yoy.groupby('year').agg({
             'profit': 'sum',
             'YoY Growth %': 'mean'
         }).reset_index()
 
-        # Create combined chart with dual y-axis
         fig_profit_yoy = go.Figure()
 
-        # Bar chart for net income
         fig_profit_yoy.add_trace(go.Bar(
             x=profit_agg['year'],
             y=profit_agg['profit'],
@@ -443,7 +395,6 @@ with col2:
             yaxis='y'
         ))
 
-        # Forecast for next year using linear regression
         if len(profit_agg) >= 2:
             years = profit_agg['year'].values
             profits = profit_agg['profit'].values
@@ -451,7 +402,6 @@ with col2:
             next_year = int(years.max()) + 1
             forecast_profit = slope * next_year + intercept
 
-            # Add forecast bar
             fig_profit_yoy.add_trace(go.Bar(
                 x=[next_year],
                 y=[forecast_profit],
@@ -462,7 +412,6 @@ with col2:
                 showlegend=False
             ))
 
-            # Add annotation for forecast (without arrow)
             fig_profit_yoy.add_annotation(
                 x=next_year,
                 y=forecast_profit,
@@ -472,7 +421,6 @@ with col2:
                 font=dict(size=10)
             )
 
-        # Line chart for YoY growth
         fig_profit_yoy.add_trace(go.Scatter(
             x=profit_agg['year'],
             y=profit_agg['YoY Growth %'],
@@ -483,7 +431,6 @@ with col2:
             yaxis='y2'
         ))
 
-        # Forecast YoY growth using linear regression
         if len(profit_agg) >= 2:
             yoy_values = profit_agg['YoY Growth %'].dropna().values
             yoy_years = profit_agg[profit_agg['YoY Growth %'].notna()]['year'].values
@@ -494,7 +441,6 @@ with col2:
                 last_yoy = profit_agg['YoY Growth %'].dropna().iloc[-1]
                 last_year = int(profit_agg[profit_agg['YoY Growth %'].notna()]['year'].iloc[-1])
 
-                # Add dashed line from last point to forecast
                 fig_profit_yoy.add_trace(go.Scatter(
                     x=[last_year, next_year],
                     y=[last_yoy, forecast_yoy],
@@ -504,7 +450,6 @@ with col2:
                     showlegend=False
                 ))
 
-                # Add forecast point for YoY
                 fig_profit_yoy.add_trace(go.Scatter(
                     x=[next_year],
                     y=[forecast_yoy],
@@ -536,24 +481,21 @@ with col2:
     else:
         st.info("No profit data available for selected stocks")
 
-# Chart 3: Assets vs Equity Trend
+# Assets vs Equity
 st.subheader("Assets vs Equity Trend")
 
 if not assets_filtered.empty and not equity_filtered.empty:
-    # Merge assets and equity data
     assets_equity = assets_filtered.merge(
         equity_filtered[['ticker', 'year', 'equity']],
         on=['ticker', 'year'],
         how='inner'
     )
 
-    # Aggregate by year
     assets_equity_agg = assets_equity.groupby('year').agg({
         'assets': 'sum',
         'equity': 'sum'
     }).reset_index()
 
-    # Create grouped bar chart
     fig_assets_equity = go.Figure()
 
     fig_assets_equity.add_trace(go.Bar(
@@ -587,7 +529,7 @@ if not assets_filtered.empty and not equity_filtered.empty:
 else:
     st.info("No assets or equity data available for selected stocks")
 
-# Chart 4: CAGR Analysis and Growth Classification
+# CAGR Analysis
 col1, col2 = st.columns([4, 1])
 
 with col1:
@@ -606,7 +548,6 @@ with col1:
             n_years = int(last_year) - int(first_year)
 
             if n_years > 0:
-                # Calculate CAGR
                 cagr_data = revenue_wide[['ticker', first_year, last_year]].copy()
                 cagr_data['CAGR %'] = ((cagr_data[last_year] / cagr_data[first_year]) ** (1/n_years) - 1) * 100
                 cagr_data = cagr_data.dropna().sort_values('CAGR %', ascending=False)
@@ -666,9 +607,7 @@ with col2:
 
 st.markdown("---")
 
-# =============================================================================
-# SECTION 6: Valuation Analysis
-# =============================================================================
+# Valuation Analysis
 st.markdown("## 💎 Valuation Analysis")
 
 col1, col2 = st.columns(2)
@@ -681,7 +620,6 @@ with col1:
         peg_data = peg_data.sort_values('PEG', ascending=True)
 
         if not peg_data.empty:
-            # Color based on PEG value (green for undervalued < 1, yellow for fair 1-2, red for overvalued > 2)
             fig_peg = px.bar(
                 peg_data,
                 x='ticker',
@@ -697,7 +635,6 @@ with col1:
                 xaxis_title='',
                 yaxis_title='PEG Ratio'
             )
-            # Add reference line at PEG = 1 (fair value)
             fig_peg.add_hline(y=1, line_dash="dash", line_color="gray",
                             annotation_text="Fair Value (PEG=1)",
                             annotation_position="top right")
@@ -730,11 +667,9 @@ with col2:
                 xaxis_title='',
                 yaxis_title='P/E Ratio'
             )
-            # Add reference line at P/E = 25 (market average)
             fig_pe.add_hline(y=25, line_dash="dash", line_color="gray",
                            annotation_text="Market Avg (P/E=25)",
                            annotation_position="top right")
-            # Add reference line at P/E = 50 (high valuation)
             fig_pe.add_hline(y=50, line_dash="dot", line_color="red",
                            annotation_text="High (P/E=50)",
                            annotation_position="top right")
@@ -746,19 +681,15 @@ with col2:
 
 st.markdown("---")
 
-# =============================================================================
-# SECTION 7: Key Insights & Recommendations
-# =============================================================================
+# Key Insights & Recommendations
 st.markdown("## 🔍 Key Insights & Recommendations")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    # Top performers by ROE
     top_roe = stats_filtered.nlargest(3, 'Return on Equity')[['ticker', 'Return on Equity']]
     roe_list = " | ".join([f"<strong>{row['ticker']}</strong> {row['Return on Equity']:.1f}%" for _, row in top_roe.iterrows()])
 
-    # Highest Profit Margins
     top_margin = stats_filtered.nlargest(3, 'Profit Margin')[['ticker', 'Profit Margin']]
     margin_list = " | ".join([f"<strong>{row['ticker']}</strong> {row['Profit Margin']:.1f}%" for _, row in top_margin.iterrows()])
 
@@ -771,14 +702,12 @@ with col1:
     """, unsafe_allow_html=True)
 
 with col2:
-    # Undervalued stocks
     undervalued = valuation_filtered[valuation_filtered['PEG'] < 1].dropna(subset=['PEG'])
     if not undervalued.empty:
         undervalued_list = " | ".join([f"<strong>{row['ticker']}</strong> PEG={row['PEG']:.2f}" for _, row in undervalued.iterrows()])
     else:
         undervalued_list = "No stocks with PEG < 1"
 
-    # Risk indicators
     high_pe = valuation_filtered[valuation_filtered['Trailing P/E'] > 50].dropna(subset=['Trailing P/E'])
     if not high_pe.empty:
         high_pe_list = " | ".join([f"<strong>{row['ticker']}</strong> P/E={row['Trailing P/E']:.1f}" for _, row in high_pe.head(3).iterrows()])
