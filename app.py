@@ -341,14 +341,14 @@ with col1:
                 showlegend=False
             ))
 
-            # Add annotation for forecast
+            # Add annotation for forecast (without arrow)
             fig_rev_yoy.add_annotation(
                 x=next_year,
                 y=forecast_revenue,
-                text=f"Forecast",
-                showarrow=True,
-                arrowhead=2,
-                yshift=10
+                text="Forecast",
+                showarrow=False,
+                yshift=15,
+                font=dict(size=10)
             )
 
         # Line chart for YoY growth
@@ -361,6 +361,37 @@ with col1:
             line=dict(width=3, color='#ff6b6b'),
             yaxis='y2'
         ))
+
+        # Forecast YoY growth using linear regression
+        if len(revenue_agg) >= 2:
+            yoy_values = revenue_agg['YoY Growth %'].dropna().values
+            yoy_years = revenue_agg[revenue_agg['YoY Growth %'].notna()]['year'].values
+            if len(yoy_values) >= 2:
+                slope_yoy, intercept_yoy, _, _, _ = scipy_stats.linregress(yoy_years, yoy_values)
+                next_year = int(revenue_agg['year'].max()) + 1
+                forecast_yoy = slope_yoy * next_year + intercept_yoy
+                last_yoy = revenue_agg['YoY Growth %'].dropna().iloc[-1]
+                last_year = int(revenue_agg[revenue_agg['YoY Growth %'].notna()]['year'].iloc[-1])
+
+                # Add dashed line from last point to forecast
+                fig_rev_yoy.add_trace(go.Scatter(
+                    x=[last_year, next_year],
+                    y=[last_yoy, forecast_yoy],
+                    mode='lines',
+                    line=dict(dash='dash', width=2, color='rgba(255, 107, 107, 0.5)'),
+                    yaxis='y2',
+                    showlegend=False
+                ))
+
+                # Add forecast point for YoY
+                fig_rev_yoy.add_trace(go.Scatter(
+                    x=[next_year],
+                    y=[forecast_yoy],
+                    mode='markers',
+                    marker=dict(size=10, color='#ff6b6b', opacity=0.5),
+                    yaxis='y2',
+                    showlegend=False
+                ))
 
         fig_rev_yoy.update_layout(
             height=400,
@@ -431,14 +462,14 @@ with col2:
                 showlegend=False
             ))
 
-            # Add annotation for forecast
+            # Add annotation for forecast (without arrow)
             fig_profit_yoy.add_annotation(
                 x=next_year,
                 y=forecast_profit,
-                text=f"Forecast",
-                showarrow=True,
-                arrowhead=2,
-                yshift=10
+                text="Forecast",
+                showarrow=False,
+                yshift=15,
+                font=dict(size=10)
             )
 
         # Line chart for YoY growth
@@ -451,6 +482,37 @@ with col2:
             line=dict(width=3, color='#feca57'),
             yaxis='y2'
         ))
+
+        # Forecast YoY growth using linear regression
+        if len(profit_agg) >= 2:
+            yoy_values = profit_agg['YoY Growth %'].dropna().values
+            yoy_years = profit_agg[profit_agg['YoY Growth %'].notna()]['year'].values
+            if len(yoy_values) >= 2:
+                slope_yoy, intercept_yoy, _, _, _ = scipy_stats.linregress(yoy_years, yoy_values)
+                next_year = int(profit_agg['year'].max()) + 1
+                forecast_yoy = slope_yoy * next_year + intercept_yoy
+                last_yoy = profit_agg['YoY Growth %'].dropna().iloc[-1]
+                last_year = int(profit_agg[profit_agg['YoY Growth %'].notna()]['year'].iloc[-1])
+
+                # Add dashed line from last point to forecast
+                fig_profit_yoy.add_trace(go.Scatter(
+                    x=[last_year, next_year],
+                    y=[last_yoy, forecast_yoy],
+                    mode='lines',
+                    line=dict(dash='dash', width=2, color='rgba(254, 202, 87, 0.5)'),
+                    yaxis='y2',
+                    showlegend=False
+                ))
+
+                # Add forecast point for YoY
+                fig_profit_yoy.add_trace(go.Scatter(
+                    x=[next_year],
+                    y=[forecast_yoy],
+                    mode='markers',
+                    marker=dict(size=10, color='#feca57', opacity=0.5),
+                    yaxis='y2',
+                    showlegend=False
+                ))
 
         fig_profit_yoy.update_layout(
             height=400,
@@ -604,6 +666,85 @@ with col2:
 
 st.markdown("---")
 
+# =============================================================================
+# SECTION 6: Valuation Analysis
+# =============================================================================
+st.markdown("## 💎 Valuation Analysis")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("PEG Ratio by Stock")
+
+    if not valuation_filtered.empty:
+        peg_data = valuation_filtered[['ticker', 'PEG']].dropna().copy()
+        peg_data = peg_data.sort_values('PEG', ascending=True)
+
+        if not peg_data.empty:
+            # Color based on PEG value (green for undervalued < 1, yellow for fair 1-2, red for overvalued > 2)
+            fig_peg = px.bar(
+                peg_data,
+                x='ticker',
+                y='PEG',
+                color='PEG',
+                color_continuous_scale='RdYlGn_r',
+                title=''
+            )
+            fig_peg.update_layout(
+                height=400,
+                coloraxis_showscale=False,
+                margin=dict(l=20, r=20, t=40, b=40),
+                xaxis_title='',
+                yaxis_title='PEG Ratio'
+            )
+            # Add reference line at PEG = 1 (fair value)
+            fig_peg.add_hline(y=1, line_dash="dash", line_color="gray",
+                            annotation_text="Fair Value (PEG=1)",
+                            annotation_position="top right")
+            st.plotly_chart(fig_peg, use_container_width=True)
+        else:
+            st.info("No PEG data available")
+    else:
+        st.info("No valuation data available")
+
+with col2:
+    st.subheader("Trailing P/E Ratio by Stock")
+
+    if not valuation_filtered.empty:
+        pe_data = valuation_filtered[['ticker', 'Trailing P/E']].dropna().copy()
+        pe_data = pe_data.sort_values('Trailing P/E', ascending=True)
+
+        if not pe_data.empty:
+            fig_pe = px.bar(
+                pe_data,
+                x='ticker',
+                y='Trailing P/E',
+                color='Trailing P/E',
+                color_continuous_scale='RdYlGn_r',
+                title=''
+            )
+            fig_pe.update_layout(
+                height=400,
+                coloraxis_showscale=False,
+                margin=dict(l=20, r=20, t=40, b=40),
+                xaxis_title='',
+                yaxis_title='P/E Ratio'
+            )
+            # Add reference line at P/E = 25 (market average)
+            fig_pe.add_hline(y=25, line_dash="dash", line_color="gray",
+                           annotation_text="Market Avg (P/E=25)",
+                           annotation_position="top right")
+            # Add reference line at P/E = 50 (high valuation)
+            fig_pe.add_hline(y=50, line_dash="dot", line_color="red",
+                           annotation_text="High (P/E=50)",
+                           annotation_position="top right")
+            st.plotly_chart(fig_pe, use_container_width=True)
+        else:
+            st.info("No P/E data available")
+    else:
+        st.info("No valuation data available")
+
+st.markdown("---")
 
 # =============================================================================
 # SECTION 7: Key Insights & Recommendations
